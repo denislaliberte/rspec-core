@@ -1341,6 +1341,20 @@ module RSpec::Core
       end
     end
 
+    describe "#backtrace_inclusion_patterns" do
+      before { config.backtrace_exclusion_patterns << /.*/ }
+
+      it 'can be assigned to' do
+        config.backtrace_inclusion_patterns = [/foo/]
+        expect(config.backtrace_formatter.exclude?("food")).to be false
+      end
+
+      it 'can be appended to' do
+        config.backtrace_inclusion_patterns << /foo/
+        expect(config.backtrace_formatter.exclude?("food")).to be false
+      end
+    end
+
     describe "#filter_gems_from_backtrace" do
       def exclude?(line)
         config.backtrace_formatter.exclude?(line)
@@ -1354,6 +1368,22 @@ module RSpec::Core
           config.filter_gems_from_backtrace "foo", "bar"
         }.to change { exclude?(line_1) }.from(false).to(true).
          and change { exclude?(line_2) }.from(false).to(true)
+      end
+    end
+
+    describe "#profile_examples" do
+      it "defaults to false" do
+        expect(config.profile_examples).to be false
+      end
+
+      it "can be set to an integer value" do
+        config.profile_examples = 17
+        expect(config.profile_examples).to eq(17)
+      end
+
+      it "returns 10 when set simply enabled" do
+        config.profile_examples = true
+        expect(config.profile_examples).to eq(10)
       end
     end
 
@@ -1730,18 +1760,21 @@ module RSpec::Core
       end
     end
 
+    def example_numbered(num)
+      instance_double(Example, :id => "./foo_spec.rb[1:#{num}]")
+    end
+
     describe "#force" do
       context "for ordering options" do
-        let(:list) { [1, 2, 3, 4] }
+        let(:list) { 1.upto(4).map { |i| example_numbered(i) } }
         let(:ordering_strategy) { config.ordering_registry.fetch(:global) }
-        let(:rng) { RSpec::Core::RandomNumberGenerator.new config.seed }
-        let(:shuffled) { Ordering::Random.new(config).shuffle list, rng }
+        let(:shuffled) { Ordering::Random.new(config).order list }
 
         specify "CLI `--order defined` takes precedence over `config.order = rand`" do
           config.force :order => "defined"
           config.order = "rand"
 
-          expect(ordering_strategy.order(list)).to eq([1, 2, 3, 4])
+          expect(ordering_strategy.order(list)).to eq(list)
         end
 
         specify "CLI `--order rand:37` takes precedence over `config.order = defined`" do
@@ -1763,7 +1796,7 @@ module RSpec::Core
         specify "CLI `--order defined` takes precedence over `config.register_ordering(:global)`" do
           config.force :order => "defined"
           config.register_ordering(:global, &:reverse)
-          expect(ordering_strategy.order(list)).to eq([1, 2, 3, 4])
+          expect(ordering_strategy.order(list)).to eq(list)
         end
       end
 
@@ -1787,7 +1820,7 @@ module RSpec::Core
 
     describe "#seed_used?" do
       def use_seed_on(registry)
-        registry.fetch(:random).order([1, 2])
+        registry.fetch(:random).order([example_numbered(1), example_numbered(2)])
       end
 
       it 'returns false if neither ordering registry used the seed' do
@@ -2058,6 +2091,20 @@ module RSpec::Core
 
     describe "hooks" do
       include_examples "warning of deprecated `:example_group` during filtering configuration", :before, :each
+    end
+
+    describe '#threadsafe', :threadsafe => true do
+      it 'defaults to false' do
+        expect(config.threadsafe).to eq true
+      end
+
+      it 'can be configured to true or false' do
+        config.threadsafe = true
+        expect(config.threadsafe).to eq true
+
+        config.threadsafe = false
+        expect(config.threadsafe).to eq false
+      end
     end
 
     # assigns files_or_directories_to_run and triggers post-processing

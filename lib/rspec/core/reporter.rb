@@ -141,20 +141,27 @@ module RSpec::Core
 
     # @private
     def finish
-      stop
-      notify :start_dump,    Notifications::NullNotification
-      notify :dump_pending,  Notifications::ExamplesNotification.new(self)
-      notify :dump_failures, Notifications::ExamplesNotification.new(self)
-      notify :deprecation_summary, Notifications::NullNotification
-      unless mute_profile_output?
-        notify :dump_profile, Notifications::ProfileNotification.new(@duration, @examples,
-                                                                     @configuration.profile_examples)
+      close_after do
+        stop
+        notify :start_dump,    Notifications::NullNotification
+        notify :dump_pending,  Notifications::ExamplesNotification.new(self)
+        notify :dump_failures, Notifications::ExamplesNotification.new(self)
+        notify :deprecation_summary, Notifications::NullNotification
+        unless mute_profile_output?
+          notify :dump_profile, Notifications::ProfileNotification.new(@duration, @examples,
+                                                                       @configuration.profile_examples)
+        end
+        notify :dump_summary, Notifications::SummaryNotification.new(@duration, @examples, @failed_examples,
+                                                                     @pending_examples, @load_time)
+        notify :seed, Notifications::SeedNotification.new(@configuration.seed, seed_used?)
       end
-      notify :dump_summary, Notifications::SummaryNotification.new(@duration, @examples, @failed_examples,
-                                                                   @pending_examples, @load_time)
-      notify :seed, Notifications::SeedNotification.new(@configuration.seed, seed_used?)
+    end
+
+    # @private
+    def close_after
+      yield
     ensure
-      notify :close, Notifications::NullNotification
+      close
     end
 
     # @private
@@ -170,7 +177,18 @@ module RSpec::Core
       end
     end
 
+    # @private
+    def abort_with(msg, exit_status)
+      message(msg)
+      close
+      exit!(exit_status)
+    end
+
   private
+
+    def close
+      notify :close, Notifications::NullNotification
+    end
 
     def mute_profile_output?
       # Don't print out profiled info if there are failures and `--fail-fast` is

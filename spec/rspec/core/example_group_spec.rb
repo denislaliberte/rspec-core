@@ -168,6 +168,16 @@ module RSpec::Core
         }.to raise_error(/ExampleGroups::CallingAnUndefinedMethod/)
       end
 
+      it "assigns the const before including shared contexts via metadata so error messages from eval'ing the context include the name" do
+        RSpec.shared_context("foo", :foo) { bar }
+
+        expect {
+          RSpec.describe("Including shared context via metadata", :foo)
+        }.to raise_error(NameError,
+          a_string_including('ExampleGroups::IncludingSharedContextViaMetadata', 'bar')
+        )
+      end
+
       it 'does not have problems with example groups named "Core"', :unless => RUBY_VERSION == '1.9.2' do
         RSpec.describe("Core")
         expect(defined?(::RSpec::ExampleGroups::Core)).to be_truthy
@@ -1366,28 +1376,12 @@ module RSpec::Core
         let(:group) { RSpec.describe }
 
         before do
-          allow(RSpec.world).to receive(:wants_to_quit) { true }
-          allow(RSpec.world).to receive(:clear_remaining_example_groups)
+          RSpec.world.wants_to_quit = true
         end
 
         it "returns without starting the group" do
           expect(reporter).not_to receive(:example_group_started)
           self.group.run(reporter)
-        end
-
-        context "at top level" do
-          it "purges remaining groups" do
-            expect(RSpec.world).to receive(:clear_remaining_example_groups)
-            self.group.run(reporter)
-          end
-        end
-
-        context "in a nested group" do
-          it "does not purge remaining groups" do
-            nested_group = self.group.describe
-            expect(RSpec.world).not_to receive(:clear_remaining_example_groups)
-            nested_group.run(reporter)
-          end
         end
       end
 

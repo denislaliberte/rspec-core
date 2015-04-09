@@ -1,5 +1,7 @@
 require 'rspec/core'  # to fix annoying "undefined method `configuration' for RSpec:Module (NoMethodError)"
 
+require './spec/support/formatter_support'
+
 Then /^the output should contain all of these:$/ do |table|
   table.raw.flatten.each do |string|
     assert_partial_output(string, all_output)
@@ -124,3 +126,60 @@ end
 When /^I create "([^"]*)" with the following content:$/ do |file_name, content|
   write_file(file_name, content)
 end
+
+Given(/^I have run `([^`]*)` once, resulting in "([^"]*)"$/) do |command, output_snippet|
+  step %Q{I run `#{command}`}
+  step %Q{the output from "#{command}" should contain "#{output_snippet}"}
+end
+
+When(/^I fix "(.*?)" by replacing "(.*?)" with "(.*?)"$/) do |file_name, original, replacement|
+  in_current_dir do
+    contents = File.read(file_name)
+    expect(contents).to include(original)
+    fixed = contents.sub(original, replacement)
+    File.open(file_name, "w") { |f| f.write(fixed) }
+  end
+end
+
+Then(/^it should fail with "(.*?)"$/) do |snippet|
+  assert_failing_with(snippet)
+end
+
+Given(/^I have not configured `example_status_persistence_file_path`$/) do
+  in_current_dir do
+    return unless File.exist?("spec/spec_helper.rb")
+    return unless File.read("spec/spec_helper.rb").include?("example_status_persistence_file_path")
+    File.open("spec/spec_helper.rb", "w") { |f| f.write("") }
+  end
+end
+
+Given(/^files "(.*?)" through "(.*?)" with an unrelated passing spec in each file$/) do |file1, file2|
+  index_1 = Integer(file1[/\d+/])
+  index_2 = Integer(file2[/\d+/])
+  pattern = file1.sub(/\d+/, '%s')
+
+  index_1.upto(index_2) do |index|
+    write_file(pattern % index, <<-EOS)
+      RSpec.describe "Spec file #{index}" do
+        example { }
+      end
+    EOS
+  end
+end
+
+Then(/^bisect should (succeed|fail) with output like:$/) do |succeed, expected_output|
+  last_process = only_processes.last
+  expect(last_exit_status).to eq(succeed == "succeed" ? 0 : 1)
+
+  expected = normalize_durations(expected_output)
+  actual   = normalize_durations(last_process.stdout)
+
+  expect(actual.sub(/\n+\Z/, '')).to eq(expected)
+end
+
+When(/^I run `([^`]+)` and abort in the middle with ctrl\-c$/) do |cmd|
+  set_env('RUBYOPT', ENV['RUBYOPT'] + " -r#{File.expand_path("../../support/send_sigint_during_bisect.rb", __FILE__)}")
+  step "I run `#{cmd}`"
+end
+
+World(FormatterSupport)

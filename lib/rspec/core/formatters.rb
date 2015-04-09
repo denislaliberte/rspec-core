@@ -71,6 +71,7 @@ module RSpec::Core::Formatters
   autoload :ProgressFormatter,      'rspec/core/formatters/progress_formatter'
   autoload :ProfileFormatter,       'rspec/core/formatters/profile_formatter'
   autoload :JsonFormatter,          'rspec/core/formatters/json_formatter'
+  autoload :BisectFormatter,        'rspec/core/formatters/bisect_formatter'
 
   # Register the formatter class
   # @param formatter_class [Class] formatter class to register
@@ -138,13 +139,7 @@ module RSpec::Core::Formatters
         formatter = RSpec::LegacyFormatters.load_formatter formatter_class, *args
         @reporter.register_listener formatter, *formatter.notifications
       else
-        line = ::RSpec::CallerFilter.first_non_rspec_line
-        if line
-          call_site = "Formatter added at: #{line}"
-        else
-          call_site = "The formatter was added via command line flag or your "\
-                      "`.rspec` file."
-        end
+        call_site = "Formatter added at: #{::RSpec::CallerFilter.first_non_rspec_line}"
 
         RSpec.warn_deprecation <<-WARNING.gsub(/\s*\|/, ' ')
           |The #{formatter_class} formatter uses the deprecated formatter
@@ -192,6 +187,8 @@ module RSpec::Core::Formatters
         ProgressFormatter
       when 'j', 'json'
         JsonFormatter
+      when 'bisect'
+        BisectFormatter
       end
     end
 

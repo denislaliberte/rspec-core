@@ -53,6 +53,7 @@ module RSpec
 
           it "is not exposed to the global namespace when monkey patching is disabled" do
             RSpec.configuration.expose_dsl_globally = false
+            expect(RSpec.configuration.expose_dsl_globally?).to eq(false)
             expect(Kernel).to_not respond_to(shared_method_name)
           end
 
@@ -131,6 +132,22 @@ module RSpec
 
               expect(matching_group.bar).to eq("bar")
               expect(non_matching_group).not_to respond_to(:bar)
+            end
+
+            describe "when it has a `let` and applies to an individual example via metadata" do
+              it 'defines the `let` method correctly' do
+                define_shared_group("name", :include_it) do
+                  let(:foo) { "bar" }
+                end
+
+                ex = value = nil
+                RSpec.describe "group" do
+                  ex = example("ex1", :include_it) { value = foo }
+                end.run
+
+                expect(ex.execution_result).to have_attributes(:status => :passed, :exception => nil)
+                expect(value).to eq("bar")
+              end
             end
 
             describe "hooks for individual examples that have matching metadata" do

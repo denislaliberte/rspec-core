@@ -35,7 +35,7 @@ module RSpec
       # @private
       def self.idempotently_define_singleton_method(name, &definition)
         (class << self; self; end).module_exec do
-          remove_method(name) if method_defined?(name)
+          remove_method(name) if method_defined?(name) && instance_method(name).owner == self
           define_method(name, &definition)
         end
       end
@@ -359,7 +359,6 @@ module RSpec
       def self.subclass(parent, description, args, &example_group_block)
         subclass = Class.new(parent)
         subclass.set_it_up(description, *args, &example_group_block)
-        ExampleGroups.assign_const(subclass)
         subclass.module_exec(&example_group_block) if example_group_block
 
         # The LetDefinitions module must be included _after_ other modules
@@ -390,6 +389,7 @@ module RSpec
           superclass.method(:next_runnable_index_for),
           description, *args, &example_group_block
         )
+        ExampleGroups.assign_const(self)
 
         hooks.register_globals(self, RSpec.configuration.hooks)
         RSpec.configuration.configure_group(self)
@@ -436,11 +436,6 @@ module RSpec
       end
 
       # @private
-      def self.top_level?
-        @top_level ||= superclass == ExampleGroup
-      end
-
-      # @private
       def self.ensure_example_groups_are_configured
         unless defined?(@@example_groups_configured)
           RSpec.configuration.configure_mock_framework
@@ -467,7 +462,7 @@ module RSpec
       def self.run_before_context_hooks(example_group_instance)
         set_ivars(example_group_instance, superclass_before_context_ivars)
 
-        ContextHookMemoizedHash::Before.isolate_for_context_hook(example_group_instance) do
+        ContextHookMemoized::Before.isolate_for_context_hook(example_group_instance) do
           hooks.run(:before, :context, example_group_instance)
         end
       ensure
@@ -480,6 +475,7 @@ module RSpec
           superclass.before_context_ivars
         end
       else # 1.8.7
+        # :nocov:
         # @private
         def self.superclass_before_context_ivars
           if superclass.respond_to?(:before_context_ivars)
@@ -494,13 +490,14 @@ module RSpec
             ancestors.find { |a| a.respond_to?(:before_context_ivars) }.before_context_ivars
           end
         end
+        # :nocov:
       end
 
       # @private
       def self.run_after_context_hooks(example_group_instance)
         set_ivars(example_group_instance, before_context_ivars)
 
-        ContextHookMemoizedHash::After.isolate_for_context_hook(example_group_instance) do
+        ContextHookMemoized::After.isolate_for_context_hook(example_group_instance) do
           hooks.run(:after, :context, example_group_instance)
         end
       ensure
@@ -509,10 +506,7 @@ module RSpec
 
       # Runs all the examples in this group.
       def self.run(reporter=RSpec::Core::NullReporter)
-        if RSpec.world.wants_to_quit
-          RSpec.world.clear_remaining_example_groups if top_level?
-          return
-        end
+        return if RSpec.world.wants_to_quit
         reporter.example_group_started(self)
 
         should_run_context_hooks = descendant_filtered_examples.any?
@@ -523,9 +517,11 @@ module RSpec
           result_for_this_group && results_for_descendants
         rescue Pending::SkipDeclaredInExample => ex
           for_filtered_examples(reporter) { |example| example.skip_with_exception(reporter, ex) }
+          true
         rescue Exception => ex
           RSpec.world.wants_to_quit = true if fail_fast?
           for_filtered_examples(reporter) { |example| example.fail_with_exception(reporter, ex) }
+          false
         ensure
           run_after_context_hooks(new('after(:context) hook')) if should_run_context_hooks
           reporter.example_group_finished(self)
@@ -601,8 +597,10 @@ module RSpec
       end
 
       if RUBY_VERSION.to_f < 1.9
+        # :nocov:
         # @private
         INSTANCE_VARIABLE_TO_IGNORE = '@__inspect_output'.freeze
+        # :nocov:
       else
         # @private
         INSTANCE_VARIABLE_TO_IGNORE = :@__inspect_output
@@ -617,6 +615,7 @@ module RSpec
 
       def initialize(inspect_output=nil)
         @__inspect_output = inspect_output || '(no description provided)'
+        super() # no args get passed
       end
 
       # @private
@@ -625,10 +624,12 @@ module RSpec
       end
 
       unless method_defined?(:singleton_class) # for 1.8.7
+        # :nocov:
         # @private
         def singleton_class
           class << self; self; end
         end
+        # :nocov:
       end
 
       # Raised when an RSpec API is called in the wrong scope, such as `before`
@@ -760,6 +761,7 @@ module RSpec
     end
 
     if RUBY_VERSION == '1.9.2'
+      # :nocov:
       class << self
         alias _base_name_for base_name_for
         def base_name_for(group)
@@ -767,6 +769,7 @@ module RSpec
         end
       end
       private_class_method :_base_name_for
+      # :nocov:
     end
 
     def self.disambiguate(name, const_scope)

@@ -1,5 +1,5 @@
 module FormatterSupport
-  def run_example_specs_with_formatter(formatter_option)
+  def run_example_specs_with_formatter(formatter_option, normalize_output=true)
     options = RSpec::Core::ConfigurationOptions.new(%W[spec/rspec/core/resources/formatter_specs.rb --format #{formatter_option} --order defined])
 
     err, out = StringIO.new, StringIO.new
@@ -13,7 +13,8 @@ module FormatterSupport
     runner.run(err, out)
 
     output = out.string
-    output.gsub!(/\d+(?:\.\d+)?(s| seconds)/, "n.nnnn\\1")
+    return output unless normalize_output
+    output = normalize_durations(output)
 
     caller_line = RSpec::Core::Metadata.relative_path(caller.first)
     output.lines.reject do |line|
@@ -27,6 +28,13 @@ module FormatterSupport
       # this line varies a bit depending on how you run the specs (via `rake` vs `rspec`)
       line.include?('/exe/rspec:')
     end.join
+  end
+
+  def normalize_durations(output)
+    output.gsub(/(?:\d+ minutes? )?\d+(?:\.\d+)?(s| seconds?)/) do |dur|
+      suffix = $1 == "s" ? "s" : " seconds"
+      "n.nnnn#{suffix}"
+    end
   end
 
   if RUBY_VERSION.to_f < 1.9
@@ -175,15 +183,15 @@ module FormatterSupport
     @reporter = config.reporter
   end
 
-  def output
-    @output ||= StringIO.new
+  def formatter_output
+    @formatter_output ||= StringIO.new
   end
 
   def config
     @configuration ||=
       begin
         config = RSpec::Core::Configuration.new
-        config.output_stream = output
+        config.output_stream = formatter_output
         config
       end
   end
@@ -200,34 +208,27 @@ module FormatterSupport
       end
   end
 
-  def example
-    @example ||=
-      begin
-        result = instance_double(RSpec::Core::Example::ExecutionResult,
-                                 :pending_fixed?   => false,
-                                 :example_skipped? => false,
-                                 :status           => :passed
-                                )
-        allow(result).to receive(:exception) { exception }
-        instance_double(RSpec::Core::Example,
-                        :description       => "Example",
-                        :full_description  => "Example",
-                        :execution_result  => result,
-                        :location          => "",
-                        :location_rerun_argument => "",
-                        :metadata          => {
-                          :shared_group_inclusion_backtrace => []
-                        }
-                       )
-      end
-  end
+  def new_example(metadata = {})
+    metadata = metadata.dup
+    result = RSpec::Core::Example::ExecutionResult.new
+    result.started_at = ::Time.now
+    result.record_finished(metadata.delete(:status) { :passed }, ::Time.now)
+    result.exception = Exception.new if result.status == :failed
 
-  def exception
-    Exception.new
+    instance_double(RSpec::Core::Example,
+                     :description             => "Example",
+                     :full_description        => "Example",
+                     :execution_result        => result,
+                     :location                => "",
+                     :location_rerun_argument => "",
+                     :metadata                => {
+                       :shared_group_inclusion_backtrace => []
+                     }.merge(metadata)
+                   )
   end
 
   def examples(n)
-    (1..n).map { example }
+    Array.new(n) { new_example }
   end
 
   def group
@@ -242,7 +243,7 @@ module FormatterSupport
    ::RSpec::Core::Notifications::ExamplesNotification.new reporter
   end
 
-  def example_notification(specific_example = example)
+  def example_notification(specific_example = new_example)
    ::RSpec::Core::Notifications::ExampleNotification.for specific_example
   end
 

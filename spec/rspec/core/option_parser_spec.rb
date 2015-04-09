@@ -1,3 +1,5 @@
+require 'rspec/core/project_initializer'
+
 module RSpec::Core
   RSpec.describe OptionParser do
     before do
@@ -11,21 +13,39 @@ module RSpec::Core
       end
     end
 
-    it "does not parse empty args" do
-      parser = Parser.new
-      expect(OptionParser).not_to receive(:new)
-      parser.parse([])
+    context "when given empty args" do
+      it "does not parse them" do
+        expect(OptionParser).not_to receive(:new)
+        Parser.parse([])
+      end
+
+      it "still returns a `:files_or_directories_to_run` entry since callers expect that" do
+        expect(
+          Parser.parse([])
+        ).to eq(:files_or_directories_to_run => [])
+      end
+    end
+
+    it 'does not mutate the provided args array' do
+      args = %w[ --require foo ]
+      expect { Parser.parse(args) }.not_to change { args }
     end
 
     it "proposes you to use --help and returns an error on incorrect argument" do
-      parser = Parser.new
-      option = "--my_wrong_arg"
+      parser = Parser.new([option = "--my_wrong_arg"])
 
       expect(parser).to receive(:abort) do |msg|
         expect(msg).to include('use --help', option)
       end
 
-      parser.parse([option])
+      parser.parse
+    end
+
+    it 'treats additional arguments as `:files_or_directories_to_run`' do
+      options = Parser.parse(%w[ path/to/spec.rb --fail-fast spec/unit -Ibar 1_spec.rb:23 ])
+      expect(options).to include(
+        :files_or_directories_to_run => %w[ path/to/spec.rb spec/unit 1_spec.rb:23 ]
+      )
     end
 
     {
@@ -36,27 +56,54 @@ module RSpec::Core
     }.each do |long, shorts|
       shorts.each do |option|
         it "won't parse #{option} as a shorthand for #{long}" do
-          parser = Parser.new
+          parser = Parser.new([option])
 
           expect(parser).to receive(:abort) do |msg|
             expect(msg).to include('use --help', option)
           end
 
-          parser.parse([option])
+          parser.parse
         end
       end
     end
 
     it "won't display invalid options in the help output" do
       def generate_help_text
-        parser = Parser.new
+        parser = Parser.new(["--help"])
         allow(parser).to receive(:exit)
-        parser.parse(["--help"])
+        parser.parse
       end
 
       useless_lines = /^\s*--?\w+\s*$\n/
 
       expect { generate_help_text }.to_not output(useless_lines).to_stdout
+    end
+
+    %w[ -v --version ].each do |option|
+      describe option do
+        it "prints the version and exits" do
+          parser = Parser.new([option])
+          expect(parser).to receive(:exit)
+
+          expect {
+            parser.parse
+          }.to output("#{RSpec::Core::Version::STRING}\n").to_stdout
+        end
+      end
+    end
+
+    describe "--init" do
+      it "initializes a project and exits" do
+        project_init = instance_double(ProjectInitializer)
+        allow(ProjectInitializer).to receive_messages(:new => project_init)
+
+        parser = Parser.new(["--init"])
+
+        expect(project_init).to receive(:run).ordered
+        expect(parser).to receive(:exit).ordered
+
+        parser.parse
+      end
     end
 
     describe "-I" do
@@ -120,6 +167,34 @@ module RSpec::Core
       it 'sets the deprecation stream' do
         options = Parser.parse(["--deprecation-out", "path/to/log"])
         expect(options).to include(:deprecation_stream => "path/to/log")
+      end
+    end
+
+    describe "--only-failures" do
+      it 'is equivalent to `--tag last_run_status:failed`' do
+        tag = Parser.parse(%w[ --tag last_run_status:failed ])
+        only_failures = Parser.parse(%w[ --only-failures ])
+
+        expect(only_failures).to include(tag)
+      end
+    end
+
+    describe "--next-failure" do
+      it 'is equivalent to `--tag last_run_status:failed --fail-fast --order defined`' do
+        long_form = Parser.parse(%w[ --tag last_run_status:failed --fail-fast --order defined ])
+        next_failure = Parser.parse(%w[ --next-failure ])
+
+        expect(next_failure).to include(long_form)
+      end
+
+      it 'does not force `--order defined` over a specified `--seed 1234` option that comes before it' do
+        options = Parser.parse(%w[ --seed 1234 --next-failure ])
+        expect(options).to include(:order => "rand:1234")
+      end
+
+      it 'does not force `--order defined` over a specified `--seed 1234` option that comes after it' do
+        options = Parser.parse(%w[ --next-failure --seed 1234 ])
+        expect(options).to include(:order => "rand:1234")
       end
     end
 

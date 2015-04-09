@@ -1,5 +1,5 @@
 ### Development
-[Full Changelog](http://github.com/rspec/rspec-core/compare/v3.2.2...master)
+[Full Changelog](http://github.com/rspec/rspec-core/compare/v3.2.3...master)
 
 Enhancements:
 
@@ -15,12 +15,47 @@ Enhancements:
   where the location isn't unique. (Myron Marston, #1884)
 * Use the example id in the rerun command printed for failed examples
   when the location is not unique. (Myron Marston, #1884)
+* Add `config.example_status_persistence_file_path` option, which is
+  used to persist the last run status of each example. (Myron Marston, #1888)
+* Add `:last_run_status` metadata to each example, which indicates what
+  happened the last time an example ran. (Myron Marston, #1888)
+* Add `--only-failures` CLI option which filters to only the examples
+  that failed the last time they ran. (Myron Marston, #1888)
+* Add `--next-failure` CLI option which allows you to repeatedly focus
+  on just one of the currently failing examples, then move on to the
+  next failure, etc. (Myron Marston, #1888)
+* Make `--order random` ordering stable, so that when you rerun a
+  subset with a given seed, the examples will be order consistently
+  relative to each other. (Myron Marston, #1908)
+* Set example group constant earlier so errors when evaluating the context
+  include the example group name (Myron Marson, #1911)
+* Make `let` and `subject` threadsafe. (Josh Cheek, #1858)
+* Add version information into the JSON formatter. (Mark Swinson, #1883)
+* Add `--bisect` CLI option, which will repeatedly run your suite in
+  order to isolate the failures to the smallest reproducible case.
+  (Myron Marston, #1917)
 
 Bug Fixes:
 
 * Handle invalid UTF-8 strings within exception methods. (Benjamin Fleischer, #1760)
 * Fix Rake Task quoting of file names with quotes to work properly on
   Windows. (Myron Marston, #1887)
+* Fix `RSpec::Core::RakeTask#failure_message` so that it gets printed
+  when the task failed. (Myron Marston, #1905)
+* Make `let` work properly when defined in a shared context that is applied
+  to an individual example via metadata. (Myron Marston, #1912)
+
+### 3.2.3 / 2015-04-06
+[Full Changelog](http://github.com/rspec/rspec-core/compare/v3.2.2...v3.2.3)
+
+Bug Fixes:
+
+* Fix how the DSL methods are defined so that RSpec is compatible with
+  gems that define methods of the same name on `Kernel` (such as
+  the `its-it` gem). (Alex Kwiatkowski, Ryan Ong, #1907)
+* Fix `before(:context) { skip }` so that it does not wrongly cause the
+  spec suite to exit with a non-zero status when no examples failed.
+  (Myron Marston, #1926)
 
 ### 3.2.2 / 2015-03-11
 [Full Changelog](http://github.com/rspec/rspec-core/compare/v3.2.1...v3.2.2)
@@ -85,6 +120,13 @@ Enhancements:
 * Make `-I` option support multiple values when separated by
   `File::PATH_SEPARATOR`, such as `rspec -I foo:bar`. This matches
   the behavior of Ruby's `-I` option. (Fumiaki Matsushima, #1855).
+* Treat each example as having a singleton example group for the
+  purposes of applying metadata-based features that normally apply
+  to example groups to individually tagged examples. For example,
+  `RSpec.shared_context "Uses redis", :uses_redis` will now apply
+  to individual examples tagged with `:uses_redis`, as will
+  `config.include RedisHelpers, :uses_redis`, and
+  `config.before(:context, :uses_redis) { }`, etc. (Myron Marston, #1749)
 
 Bug Fixes:
 

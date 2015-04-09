@@ -1,6 +1,7 @@
 require 'rake'
 require 'rake/tasklib'
 require 'rspec/support/ruby_features'
+require 'rspec/core/shell_escape'
 
 module RSpec
   module Core
@@ -9,6 +10,7 @@ module RSpec
     # @see Rakefile
     class RakeTask < ::Rake::TaskLib
       include ::Rake::DSL if defined?(::Rake::DSL)
+      include RSpec::Core::ShellEscape
 
       # Default path to the RSpec executable.
       DEFAULT_RSPEC_PATH = File.expand_path('../../../../exe/rspec', __FILE__)
@@ -63,16 +65,12 @@ module RSpec
       # @private
       def run_task(verbose)
         command = spec_command
+        puts command if verbose
 
-        begin
-          puts command if verbose
-          success = system(command)
-        rescue
-          puts failure_message if failure_message
-        end
+        return if system(command)
+        puts failure_message if failure_message
 
-        return unless fail_on_error && !success
-
+        return unless fail_on_error
         $stderr.puts "#{command} failed" if verbose
         exit $?.exitstatus
       end
@@ -123,18 +121,6 @@ module RSpec
           # TODO: consider deprecating support for this and removing it in
           #   RSpec 4.
           FileList[pattern].sort.map { |file| escape file }
-        end
-      end
-
-      if RSpec::Support::OS.windows?
-        def escape(shell_command)
-          "'#{shell_command.gsub("'", "\\\\'")}'"
-        end
-      else
-        require 'shellwords'
-
-        def escape(shell_command)
-          shell_command.shellescape
         end
       end
 

@@ -237,12 +237,23 @@ RSpec.describe RSpec do
     expect(err).to eq("")
     expect(out.split("\n")).to eq(%w[ RSpec::Mocks RSpec::Expectations ])
     expect(status.exitstatus).to eq(0)
+
+    expect(RSpec.const_missing(:Expectations)).to be(RSpec::Expectations)
   end
 
   it 'correctly raises an error when an invalid const is referenced' do
     expect {
       RSpec::NotAConst
     }.to raise_error(NameError, /RSpec::NotAConst/)
+  end
+
+  it "does not blow up if some gem defines `Kernel#it`", :slow do
+    code = 'Kernel.module_eval { def it(*); end }; require "rspec/core"'
+    out, err, status = run_ruby_with_current_load_path(code)
+
+    expect(err).to eq("")
+    expect(out).to eq("")
+    expect(status.exitstatus).to eq(0)
   end
 end
 
