@@ -10,7 +10,7 @@ module RSpec
       # @api private
       # Formatter for providing profile output.
       class ProfileFormatter
-        Formatters.register self, :dump_profile,:example_group_started, :example_group_finished,
+        Formatters.register self, :dump_profile,:example_group_started, :example_group_finished
 
         def initialize(output)
           @output = output
