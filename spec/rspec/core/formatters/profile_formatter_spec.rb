@@ -1,5 +1,5 @@
 require 'rspec/core/formatters/profile_formatter'
-
+#todo test profiling here
 RSpec.describe RSpec::Core::Formatters::ProfileFormatter do
   include FormatterSupport
 

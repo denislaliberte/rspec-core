@@ -625,8 +625,9 @@ module RSpec::Core
         example_groups.each_value do |hash|
           hash[:average] = hash[:total_time].to_f / hash[:count]
         end
-
-        example_groups.sort_by { |_, hash| -hash[:average] }.first(number_of_examples)
+        example_groups
+        #todo sort and first in reporter
+        #example_groups.sort_by { |_, hash| -hash[:average] }.first(number_of_examples)
       end
     end
 
