@@ -1,4 +1,5 @@
 RSpec::Support.require_rspec_core "formatters/console_codes"
+require 'yaml'
 
 module RSpec
   module Core
@@ -6,10 +7,30 @@ module RSpec
       # @api private
       # Formatter for providing profile output.
       class ProfileFormatter
-        Formatters.register self, :dump_profile
+        Formatters.register self, :dump_profile, :example_group_started, :example_group_finished
 
         def initialize(output)
+          initialize_profile
           @output = output
+        end
+
+        def initialize_profile()
+          @clock = RSpec::Core::Time
+          @start = Hash.new(0)
+          @result = Hash.new(0)
+        end
+
+        def example_group_started(group)
+          key =  group.group.metadata[:location]
+          @start[key] = @clock.now
+        end
+
+        def example_group_finished(group)
+          key =  group.group.metadata[:location]
+          @result[key] = @clock.now - @start[key]
+        end
+        def get_slowest
+          @result.sort.reverse
         end
 
         # @private
@@ -42,11 +63,14 @@ module RSpec
         end
 
         def dump_profile_slowest_example_groups(profile)
-          return if profile.slowest_groups.empty?
+          puts "get slowests"
+          slowest = self.get_slowest
+          puts YAML::dump(slowest)
+          return if profile.slowest_groups(slowest).empty?
 
-          @output.puts "\nTop #{profile.slowest_groups.size} slowest example groups:"
-          profile.slowest_groups.each do |loc, hash|
-            average = "#{bold(Helpers.format_seconds(hash[:average]))} #{bold("seconds")} average"
+          @output.puts "\nTop #{profile.slowest_groups(slowest).size} slowest example groups:"
+          profile.slowest_groups(slowest).each do |loc, hash|
+            average = "#{bold(Helpers.seconds(hash[:average]))} #{bold("seconds")} average"
             total   = "#{Helpers.format_seconds(hash[:total_time])} seconds"
             count   = Helpers.pluralize(hash[:count], "example")
             @output.puts "  #{hash[:description]}"

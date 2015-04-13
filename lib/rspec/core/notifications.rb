@@ -577,23 +577,28 @@ module RSpec::Core
       end
 
       # @return [Array<RSpec::Core::Example>] the slowest example groups
-      def slowest_groups
-        @slowest_groups ||= calculate_slowest_groups
+      def slowest_groups(a)
+        @slowest_groups ||= calculate_slowest_groups(a)
       end
 
     private
 
-      def calculate_slowest_groups
+      def calculate_slowest_groups(a)
         example_groups = {}
+        asdf = a.first(2)
+        asdf.has_key?(:asdf)
 
         examples.each do |example|
           location = example.example_group.parent_groups.last.metadata[:location]
 
-          location_hash = example_groups[location] ||= Hash.new(0)
-          location_hash[:total_time]  += example.execution_result.run_time
-          location_hash[:count]       += 1
-          next if location_hash.key?(:description)
-          location_hash[:description] = example.example_group.top_level_description
+          if(asdf.has_key?(location))
+            location_hash = example_groups[location] ||= Hash.new(0)
+            #location_hash[:total_time]  += example.execution_result.run_time
+            location_hash[:total_time]  = asdf[location]
+            location_hash[:count]       += 1
+            next if location_hash.key?(:description)
+            location_hash[:description] = example.example_group.top_level_description
+          end
         end
 
         # stop if we've only one example group
