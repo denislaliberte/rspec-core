@@ -6,10 +6,27 @@ module RSpec
       # @api private
       # Formatter for providing profile output.
       class ProfileFormatter
-        Formatters.register self, :dump_profile
+        Formatters.register self, :dump_profile, :example_group_started, :example_group_finished
 
         def initialize(output)
+          initialize_profile
           @output = output
+        end
+
+        def initialize_profile()
+          @clock = RSpec::Core::Time
+          @start = Hash.new(0)
+          @result = Hash.new(0)
+        end
+
+        def example_group_started(group)
+          key =  group.group.metadata[:location]
+          @start[key] = @clock.now
+        end
+
+        def example_group_finished(group)
+          key =  group.group.metadata[:location]
+          @result[key] = @clock.now - @start[key]
         end
 
         # @private
@@ -42,10 +59,12 @@ module RSpec
         end
 
         def dump_profile_slowest_example_groups(profile)
-          return if profile.slowest_groups.empty?
+          slowest_groups = profile.new_calculate_slowest_groups(@result)
+          #slowest_groups = profile.slowest_groups
+          return if slowest_groups.empty?
 
-          @output.puts "\nTop #{profile.slowest_groups.size} slowest example groups:"
-          profile.slowest_groups.each do |loc, hash|
+          @output.puts "\nTop #{slowest_groups.size} slowest example groups:"
+          slowest_groups.each do |loc, hash|
             average = "#{bold(Helpers.format_seconds(hash[:average]))} #{bold("seconds")} average"
             total   = "#{Helpers.format_seconds(hash[:total_time])} seconds"
             count   = Helpers.pluralize(hash[:count], "example")
