@@ -609,6 +609,7 @@ module RSpec::Core
     private
 
       def calculate_slowest_groups
+      	  #todo new version wip new_calculate_slowest_groups
         example_groups = {}
 
         examples.each do |example|
