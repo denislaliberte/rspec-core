@@ -54,8 +54,7 @@ module RSpec
         end
 
         def dump_profile_slowest_example_groups(profile)
-          slowest_groups = profile.new_calculate_slowest_groups(@result)
-          #slowest_groups = profile.slowest_groups
+          slowest_groups = profile.calculate_slowest_groups(@result)
           return if slowest_groups.empty?
 
           @output.puts "\nTop #{slowest_groups.size} slowest example groups:"

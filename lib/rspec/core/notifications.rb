@@ -577,13 +577,8 @@ module RSpec::Core
       end
 
       # @return [Array<RSpec::Core::Example>] the slowest example groups
-      def slowest_groups
-        @slowest_groups ||= calculate_slowest_groups
-      end
-
-      def new_calculate_slowest_groups(execution_time)
+      def calculate_slowest_groups(execution_time)
         example_groups = {}
-        ##to_h not supported in 2.0 show stopper ?
         slowest_first = execution_time.sort.reverse.first(number_of_examples).to_h
 
         examples.each do |example|
@@ -596,30 +591,6 @@ module RSpec::Core
             location_hash[:total_time] = slowest_first[location]
           end
         end
-        # stop if we've only one example group
-        return {} if example_groups.keys.length <= 1
-
-        example_groups.each_value do |hash|
-          hash[:average] = hash[:total_time].to_f / hash[:count]
-        end
-
-        example_groups
-      end
-
-    private
-
-      def calculate_slowest_groups
-        example_groups = {}
-
-        examples.each do |example|
-          location = example.example_group.parent_groups.last.metadata[:location]
-
-          location_hash = example_groups[location] ||= Hash.new(0)
-          location_hash[:total_time]  += example.execution_result.run_time
-          location_hash[:count]       += 1
-          next if location_hash.key?(:description)
-          location_hash[:description] = example.example_group.top_level_description
-        end
 
         # stop if we've only one example group
         return {} if example_groups.keys.length <= 1
@@ -628,9 +599,10 @@ module RSpec::Core
           hash[:average] = hash[:total_time].to_f / hash[:count]
         end
 
-        example_groups.sort_by { |_, hash| -hash[:average] }.first(number_of_examples)
+        example_groups.sort.reverse.first(number_of_examples)
       end
     end
+
 
     # The `DeprecationNotification` is issued by the reporter when a deprecated
     # part of RSpec is encountered. It represents information about the
@@ -659,6 +631,7 @@ module RSpec::Core
     end
 
     # `CustomNotification` is used when sending custom events to formatters /
+
     # other registered listeners, it creates attributes based on supplied hash
     # of options.
     class CustomNotification < Struct
