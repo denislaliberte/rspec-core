@@ -577,9 +577,9 @@ module RSpec::Core
       end
 
       # @return [Array<RSpec::Core::Example>] the slowest example groups
-      def calculate_slowest_groups(execution_time)
+      def calculate_slowest_groups(execution_times)
         example_groups = {}
-        slowest_first = execution_time.sort.reverse.first(number_of_examples).to_h
+        slowest_first = execution_times.sort.reverse.first(number_of_examples).to_h
 
         examples.each do |example|
           location = example.example_group.parent_groups.last.metadata[:location]
