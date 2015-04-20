@@ -20,7 +20,7 @@ module RSpec
         end
 
         def example_group_finished(group)
-          key =  group.group.metadata[:location]
+          key = group.group.metadata[:location]
           @result[key] = Time.now - @start[key]
         end
 
