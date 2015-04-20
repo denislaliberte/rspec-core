@@ -14,19 +14,18 @@ module RSpec
         end
 
         def initialize_profile()
-          @clock = RSpec::Core::Time
           @start = Hash.new(0)
           @result = Hash.new(0)
         end
 
         def example_group_started(group)
           key =  group.group.metadata[:location]
-          @start[key] = @clock.now
+          @start[key] = Time.now
         end
 
         def example_group_finished(group)
           key =  group.group.metadata[:location]
-          @result[key] = @clock.now - @start[key]
+          @result[key] = Time.now - @start[key]
         end
 
         # @private
