@@ -1,7 +1,7 @@
 
       RSpec.describe "slow before context hook" do
         before(:context) do
-          sleep 1
+          sleep 0.4
         end
         it "example" do
           expect(10).to eq(10)
