@@ -9,13 +9,9 @@ module RSpec
         Formatters.register self, :dump_profile, :example_group_started, :example_group_finished
 
         def initialize(output)
-          initialize_profile
-          @output = output
-        end
-
-        def initialize_profile()
           @start = Hash.new(0)
           @result = Hash.new(0)
+          @output = output
         end
 
         def example_group_started(group)
