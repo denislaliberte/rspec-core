@@ -1,6 +1,8 @@
 RSpec::Support.require_rspec_core "formatters/helpers"
 RSpec::Support.require_rspec_core "shell_escape"
 RSpec::Support.require_rspec_support "encoded_string"
+RSpec::Support.require_rspec_core "formatters.rb"
+require 'yaml'
 
 module RSpec::Core
   # Notifications are value objects passed to formatters to provide them
@@ -551,6 +553,14 @@ module RSpec::Core
     # @attr number_of_examples [Fixnum] the number of examples to profile
     ProfileNotification = Struct.new(:duration, :examples, :number_of_examples)
     class ProfileNotification
+
+      RSpec::Core::Formatters.register self, :example_group_started, :example_group_finished, :example_started
+
+      def initialize(duration, examples, numbet_of_examples)
+        super(duration, examples, numbet_of_examples)
+        @example_groups = {}
+      end
+
       # @return [Array<RSpec::Core::Example>] the slowest examples
       def slowest_examples
         @slowest_examples ||=
@@ -576,6 +586,24 @@ module RSpec::Core
           end
       end
 
+      # @private
+      def example_group_started(notification)
+        @example_groups[notification.group.id] = Hash.new(0)
+        @example_groups[notification.group.id][:start] = Time.now
+        @example_groups[notification.group.id][:description] = notification.group.top_level_description
+      end
+
+      # @private
+      def example_group_finished(notification)
+        @example_groups[notification.group.id][:total_time] =  Time.now - @example_groups[notification.group.id][:start]
+      end
+
+      # @private
+      def example_started(notification)
+        group = notification.example.example_group.parent_groups.last.id
+        @example_groups[group][:count] += 1
+      end
+
       # @return [Array<RSpec::Core::Example>] the slowest example groups
       def slowest_groups
         @slowest_groups ||= calculate_slowest_groups
@@ -584,26 +612,15 @@ module RSpec::Core
     private
 
       def calculate_slowest_groups
-        example_groups = {}
-
-        examples.each do |example|
-          location = example.example_group.parent_groups.last.metadata[:location]
-
-          location_hash = example_groups[location] ||= Hash.new(0)
-          location_hash[:total_time]  += example.execution_result.run_time
-          location_hash[:count]       += 1
-          next if location_hash.key?(:description)
-          location_hash[:description] = example.example_group.top_level_description
-        end
 
         # stop if we've only one example group
-        return {} if example_groups.keys.length <= 1
+        return {} if @example_groups.keys.length <= 1
 
-        example_groups.each_value do |hash|
+        @example_groups.each_value do |hash|
           hash[:average] = hash[:total_time].to_f / hash[:count]
         end
 
-        example_groups.sort_by { |_, hash| -hash[:average] }.first(number_of_examples)
+        @example_groups.sort_by { |_, hash| -hash[:average] }.first(number_of_examples)
       end
     end
 
