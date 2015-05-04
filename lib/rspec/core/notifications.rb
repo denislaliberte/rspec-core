@@ -2,7 +2,6 @@ RSpec::Support.require_rspec_core "formatters/helpers"
 RSpec::Support.require_rspec_core "shell_escape"
 RSpec::Support.require_rspec_support "encoded_string"
 RSpec::Support.require_rspec_core "formatters.rb"
-require 'yaml'
 
 module RSpec::Core
   # Notifications are value objects passed to formatters to provide them
